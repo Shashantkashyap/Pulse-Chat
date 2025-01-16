@@ -2,21 +2,24 @@ import { useEffect, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
-import { Users } from "lucide-react";
+import { Search, Users } from "lucide-react";
 
 const Sidebar = () => {
   const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
-
   const { onlineUsers } = useAuthStore();
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     getUsers();
   }, [getUsers]);
 
-  const filteredUsers = showOnlineOnly
-    ? users.filter((user) => onlineUsers.includes(user._id))
-    : users;
+  // Filter users based on both online status and search query
+  const filteredUsers = users.filter((user) => {
+    const matchesOnline = showOnlineOnly ? onlineUsers.includes(user._id) : true;
+    const matchesSearch = user.fullName.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesOnline && matchesSearch;
+  });
 
   if (isUsersLoading) return <SidebarSkeleton />;
 
@@ -27,7 +30,22 @@ const Sidebar = () => {
           <Users className="size-6" />
           <span className="font-medium hidden lg:block">Contacts</span>
         </div>
-        {/* TODO: Online filter toggle */}
+
+        {/* Search Input */}
+        <div className="mt-3 hidden lg:block">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50" />
+            <input
+              type="text"
+              placeholder="Search contacts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input input-sm input-bordered w-full pl-10"
+            />
+          </div>
+        </div>
+
+        {/* Online filter toggle */}
         <div className="mt-3 hidden lg:flex items-center gap-2">
           <label className="cursor-pointer flex items-center gap-2">
             <input
@@ -42,6 +60,7 @@ const Sidebar = () => {
         </div>
       </div>
 
+      {/* Users list */}
       <div className="overflow-y-auto w-full py-3">
         {filteredUsers.map((user) => (
           <button
@@ -78,7 +97,9 @@ const Sidebar = () => {
         ))}
 
         {filteredUsers.length === 0 && (
-          <div className="text-center text-zinc-500 py-4">No online users</div>
+          <div className="text-center text-zinc-500 py-4">
+            {searchQuery ? "No matching contacts found" : "No online users"}
+          </div>
         )}
       </div>
     </aside>
