@@ -6,7 +6,7 @@ import { WebRTCService } from '../services/WebRTCService';
 
 export const useChatStore = create((set, get) => ({
   messages: [],
-  users: [],
+  users: [], // Initialize as empty array
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
@@ -21,9 +21,10 @@ export const useChatStore = create((set, get) => ({
     set({ isUsersLoading: true });
     try {
       const res = await axiosInstance.get("/messages/users");
-      set({ users: res.data });
+      set({ users: Array.isArray(res.data) ? res.data : [] }); // Ensure array
     } catch (error) {
-      toast.error(error.response.data.message);
+      set({ users: [] }); // Reset to empty array on error
+      toast.error(error.response?.data?.message || 'Failed to load users');
     } finally {
       set({ isUsersLoading: false });
     }

@@ -17,21 +17,30 @@ import { Toaster } from "react-hot-toast";
 import CallNotification from "./components/CallNotification";
 
 const App = () => {
-  const { authUser, checkAuth, isCheckingAuth, onlineUsers } = useAuthStore();
+  const { authUser, checkAuth, isCheckingAuth, connectSocket, onlineUsers } = useAuthStore();
   const { theme } = useThemeStore();
   const { initializeWebRTC } = useChatStore();
 
   console.log({ onlineUsers });
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    const init = async () => {
+      await checkAuth();
+    };
+    init();
+  }, []);
 
   useEffect(() => {
-    if (authUser) {
-      initializeWebRTC();
+    if (authUser?._id) {
+      console.log("Initializing services for user:", authUser._id);
+      // Connect socket first
+      connectSocket();
+      // Initialize WebRTC after socket is connected
+      setTimeout(() => {
+        initializeWebRTC();
+      }, 1000);
     }
-  }, [authUser, initializeWebRTC]);
+  }, [authUser?._id]);
 
   console.log({ authUser });
 
