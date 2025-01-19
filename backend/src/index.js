@@ -28,9 +28,9 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
-app.use("/", (req, res) => {
-  res.send("Welcome to Pulse Chat API");
-});
+// app.use("/", (req, res) => {
+//   res.send("Welcome to Pulse Chat API");
+// });
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
