@@ -25,6 +25,10 @@ app.use(
   })
 );
 
+app.use("/", (req, res) => {
+  res.send("Welcome to Pulse Chat API");
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
