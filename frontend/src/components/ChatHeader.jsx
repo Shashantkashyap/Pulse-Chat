@@ -1,10 +1,22 @@
-import { X } from "lucide-react";
+import { X, Video } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 
 const ChatHeader = () => {
-  const { selectedUser, setSelectedUser } = useChatStore();
+  const { selectedUser, setSelectedUser, startVideoCall, webRTC } = useChatStore();
   const { onlineUsers } = useAuthStore();
+
+  const handleVideoCall = async () => {
+    if (!webRTC) {
+      toast.error("Video call service not initialized");
+      return;
+    }
+    if (!onlineUsers.includes(selectedUser._id)) {
+      toast.error("User is offline");
+      return;
+    }
+    await startVideoCall(selectedUser._id);
+  };
 
   return (
     <div className="p-2.5 border-b border-base-300">
@@ -26,10 +38,18 @@ const ChatHeader = () => {
           </div>
         </div>
 
-        {/* Close button */}
-        <button onClick={() => setSelectedUser(null)}>
-          <X />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleVideoCall}
+            className="btn btn-circle btn-sm btn-ghost"
+            disabled={!onlineUsers.includes(selectedUser._id)}
+          >
+            <Video className="h-5 w-5" />
+          </button>
+          <button onClick={() => setSelectedUser(null)}>
+            <X />
+          </button>
+        </div>
       </div>
     </div>
   );

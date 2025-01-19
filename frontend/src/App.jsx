@@ -1,4 +1,4 @@
- import Navbar from "./components/Navbar";
+import Navbar from "./components/Navbar";
 
 import HomePage from "./pages/HomePage";
 import SignUpPage from "./pages/SignUpPage";
@@ -10,19 +10,28 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { useEffect } from "react";
+import { useChatStore } from "./store/useChatStore";
 
 import { Loader } from "lucide-react";
 import { Toaster } from "react-hot-toast";
+import CallNotification from "./components/CallNotification";
 
 const App = () => {
   const { authUser, checkAuth, isCheckingAuth, onlineUsers } = useAuthStore();
   const { theme } = useThemeStore();
+  const { initializeWebRTC } = useChatStore();
 
   console.log({ onlineUsers });
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    if (authUser) {
+      initializeWebRTC();
+    }
+  }, [authUser, initializeWebRTC]);
 
   console.log({ authUser });
 
@@ -36,7 +45,7 @@ const App = () => {
   return (
     <div data-theme={theme}>
       <Navbar />
-
+      <CallNotification />
       <Routes>
         <Route path="/" element={authUser ? <HomePage /> : <Navigate to="/login" />} />
         <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" />} />
