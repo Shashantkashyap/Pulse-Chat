@@ -8,9 +8,10 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "https://your-frontend-domain.com"],
+    origin: ["http://localhost:5173", "https://your-frontend-url.com"],
     credentials: true,
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   },
   allowEIO3: true,
   pingTimeout: 60000,
@@ -37,16 +38,19 @@ io.on("connection", (socket) => {
   userSocketMap[userId] = socket.id;
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
-  // Handle WebRTC signaling
+  // Handle WebRTC signaling with logging
   socket.on("webrtc-signal", async (data) => {
-    const { targetUserId } = data;
-    const receiverSocketId = userSocketMap[targetUserId];
+    console.log("Received WebRTC signal:", { type: data.type, from: userId, to: data.targetUserId });
+    const receiverSocketId = userSocketMap[data.targetUserId];
 
     if (receiverSocketId) {
+      console.log("Forwarding WebRTC signal to:", receiverSocketId);
       io.to(receiverSocketId).emit("webrtc-signal", {
         ...data,
         fromUserId: userId
       });
+    } else {
+      console.log("Target user not found:", data.targetUserId);
     }
   });
 

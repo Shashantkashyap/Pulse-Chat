@@ -82,18 +82,25 @@ export const useChatStore = create((set, get) => ({
 
   initializeWebRTC: () => {
     const socket = useAuthStore.getState().socket;
+    if (!socket?.connected) {
+        console.log('Socket not connected, skipping WebRTC initialization');
+        return;
+    }
+
+    console.log('Initializing WebRTC with socket:', socket.id);
     const webRTC = new WebRTCService(socket);
     
     webRTC.onStreamChange = ({ localStream, remoteStream }) => {
+        console.log('Stream changed:', { hasLocal: !!localStream, hasRemote: !!remoteStream });
         set({ localStream, remoteStream });
     };
 
     set({ webRTC });
 
     socket.on('call-request', async (data) => {
+        console.log('Received call request:', data);
         const { fromUser } = data;
         set({ incomingCall: fromUser });
-        // Play notification sound
         new Audio('/call-ringtone.mp3').play().catch(console.error);
     });
 
@@ -125,13 +132,18 @@ export const useChatStore = create((set, get) => ({
 
   startVideoCall: async (userId) => {
     const { webRTC } = get();
-    if (!webRTC) return;
+    if (!webRTC) {
+        toast.error('Video call service not initialized');
+        return;
+    }
 
     try {
         set({ isCallLoading: true });
+        console.log('Starting video call to:', userId);
         await webRTC.startCall(userId);
         toast.success('Calling user...');
     } catch (error) {
+        console.error('Video call error:', error);
         toast.error(error.message || 'Failed to start video call');
         webRTC.endCall();
     } finally {

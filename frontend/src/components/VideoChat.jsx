@@ -12,12 +12,14 @@ const VideoChat = () => {
 
     useEffect(() => {
         if (localVideoRef.current && localStream) {
+            console.log('Setting local video stream');
             localVideoRef.current.srcObject = localStream;
         }
     }, [localStream]);
 
     useEffect(() => {
         if (remoteVideoRef.current && remoteStream) {
+            console.log('Setting remote video stream');
             remoteVideoRef.current.srcObject = remoteStream;
         }
     }, [remoteStream]);

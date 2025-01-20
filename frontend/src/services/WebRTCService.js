@@ -6,6 +6,33 @@ export class WebRTCService {
         this.remoteStream = null;
         this.onStreamChange = null;
         this.onCallReceived = null;
+        this.currentCallId = null;
+
+        // Bind socket event handlers
+        this.setupSocketHandlers();
+    }
+
+    setupSocketHandlers() {
+        this.socket.on('webrtc-signal', async (data) => {
+            console.log('Received WebRTC signal:', data);
+            try {
+                switch (data.type) {
+                    case 'offer':
+                        await this.handleOffer(data.offer, data.fromUserId);
+                        break;
+                    case 'answer':
+                        await this.handleAnswer(data.answer);
+                        break;
+                    case 'ice-candidate':
+                        if (this.peerConnection) {
+                            await this.peerConnection.addIceCandidate(data.candidate);
+                        }
+                        break;
+                }
+            } catch (error) {
+                console.error('Error handling WebRTC signal:', error);
+            }
+        });
     }
 
     async acquireMediaStream() {
@@ -42,23 +69,40 @@ export class WebRTCService {
         }
     }
 
-    createPeerConnection() {
-        const configuration = {
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    createPeerConnection(targetUserId) {
+        console.log("Creating peer connection for:", targetUserId);
+        
+        const config = {
+            iceServers: [
+                { 
+                    urls: [
+                        'stun:stun1.l.google.com:19302',
+                        'stun:stun2.l.google.com:19302'
+                    ]
+                }
+            ],
+            iceCandidatePoolSize: 10
         };
 
-        const pc = new RTCPeerConnection(configuration);
+        const pc = new RTCPeerConnection(config);
 
-        pc.onicecandidate = (event) => {
-            if (event.candidate) {
+        pc.onicecandidate = ({ candidate }) => {
+            if (candidate) {
+                console.log("Sending ICE candidate");
                 this.socket.emit('webrtc-signal', {
                     type: 'ice-candidate',
-                    candidate: event.candidate
+                    candidate,
+                    targetUserId
                 });
             }
         };
 
+        pc.oniceconnectionstatechange = () => {
+            console.log("ICE Connection State:", pc.iceConnectionState);
+        };
+
         pc.ontrack = (event) => {
+            console.log("Received remote track");
             this.remoteStream = event.streams[0];
             this.onStreamChange?.({
                 localStream: this.localStream,
@@ -70,36 +114,47 @@ export class WebRTCService {
     }
 
     async startCall(targetUserId) {
-        // First, emit call request without creating peer connection
-        this.socket.emit('call-request', {
-            targetUserId,
-        });
+        console.log("Initiating call to:", targetUserId);
+        this.currentCallId = targetUserId;
+        this.socket.emit('call-request', { targetUserId });
     }
 
     async initializeCall(targetUserId, isInitiator = true) {
         try {
-            // Clear any existing peer connection
-            if (this.peerConnection) {
-                this.endCall();
-            }
-
-            this.peerConnection = this.createPeerConnection();
+            console.log("Initializing call:", { targetUserId, isInitiator });
             
-            // Acquire media stream
-            await this.acquireMediaStream();
+            // Cleanup any existing call
+            this.endCall();
 
+            // Create new peer connection
+            this.peerConnection = this.createPeerConnection(targetUserId);
+            
+            // Get media stream
+            this.localStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+
+            // Add tracks to peer connection
             this.localStream.getTracks().forEach(track => {
+                console.log("Adding track to peer connection:", track.kind);
                 this.peerConnection.addTrack(track, this.localStream);
             });
 
+            // Update UI with local stream
             this.onStreamChange?.({
                 localStream: this.localStream,
                 remoteStream: this.remoteStream
             });
 
             if (isInitiator) {
-                const offer = await this.peerConnection.createOffer();
+                console.log("Creating offer");
+                const offer = await this.peerConnection.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                });
                 await this.peerConnection.setLocalDescription(offer);
+                
                 this.socket.emit('webrtc-signal', {
                     type: 'offer',
                     offer,
@@ -107,6 +162,7 @@ export class WebRTCService {
                 });
             }
         } catch (error) {
+            console.error("Error in initializeCall:", error);
             this.endCall();
             throw error;
         }
@@ -118,7 +174,7 @@ export class WebRTCService {
                 this.endCall();
             }
 
-            this.peerConnection = this.createPeerConnection();
+            this.peerConnection = this.createPeerConnection(targetUserId);
             await this.acquireMediaStream();
 
             this.localStream.getTracks().forEach(track => {
@@ -154,19 +210,17 @@ export class WebRTCService {
     }
 
     endCall() {
+        console.log("Ending call");
         if (this.localStream) {
-            this.localStream.getTracks().forEach(track => {
-                track.stop();
-            });
+            this.localStream.getTracks().forEach(track => track.stop());
             this.localStream = null;
         }
-
         if (this.peerConnection) {
             this.peerConnection.close();
             this.peerConnection = null;
         }
-
         this.remoteStream = null;
+        this.currentCallId = null;
         
         this.onStreamChange?.({
             localStream: null,

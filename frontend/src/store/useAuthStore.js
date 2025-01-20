@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 
 const BASE_URL = import.meta.env.MODE === "development" ? "https://pulse-chat-3.onrender.com" : "/";
+const SOCKET_URL = "https://pulse-chat-2.onrender.com";
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
@@ -87,21 +88,46 @@ export const useAuthStore = create((set, get) => ({
 
   connectSocket: () => {
     const { authUser } = get();
-    console.log("Connecting socket for user:", authUser?._id);
-    if (!authUser || get().socket?.connected) return;
+    if (!authUser?._id) return;
 
-    const socket = io(BASE_URL, {
-      query: {
-        userId: authUser._id,
-      },
-    });
-    socket.connect();
+    try {
+      get().disconnectSocket();
 
-    set({ socket: socket });
+      console.log("Connecting socket for user:", authUser._id);
+      const socket = io(SOCKET_URL, {
+        query: { userId: authUser._id },
+        withCredentials: true,
+        transports: ['websocket'],
+        reconnection: true
+      });
 
-    socket.on("getOnlineUsers", (userIds) => {
-      set({ onlineUsers: userIds });
-    });
+      socket.on("connect", () => {
+        console.log("Socket connected with ID:", socket.id);
+        set({ socket }); // Only set socket after successful connection
+      });
+
+      // Add error handling
+      socket.on("connect_error", (error) => {
+        console.error("Socket connection error:", error);
+      });
+
+      socket.on("disconnect", (reason) => {
+        console.log("Socket disconnected:", reason);
+      });
+
+      socket.on("error", (error) => {
+        console.error("Socket error:", error);
+      });
+
+      // Set up online users listener
+      socket.on("getOnlineUsers", (userIds) => {
+        console.log("Received online users:", userIds);
+        set({ onlineUsers: userIds });
+      });
+
+    } catch (error) {
+      console.error("Socket initialization error:", error);
+    }
   },
   disconnectSocket: () => {
     if (get().socket?.connected) get().socket.disconnect();
