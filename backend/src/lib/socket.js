@@ -8,10 +8,9 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "https://your-frontend-url.com"],
+    origin: ["http://localhost:5173", "https://your-frontend-domain.com"],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    methods: ["GET", "POST"]
   },
   allowEIO3: true,
   pingTimeout: 60000,
@@ -38,61 +37,42 @@ io.on("connection", (socket) => {
   userSocketMap[userId] = socket.id;
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
-  // Handle WebRTC signaling with logging
+  // Handle WebRTC signaling
   socket.on("webrtc-signal", async (data) => {
-    const receiverSocketId = userSocketMap[data.targetUserId];
+    const { targetUserId } = data;
+    const receiverSocketId = userSocketMap[targetUserId];
+
     if (receiverSocketId) {
-      console.log("WebRTC signal:", {
-        type: data.type,
-        from: userId,
-        to: data.targetUserId
-      });
-      
       io.to(receiverSocketId).emit("webrtc-signal", {
         ...data,
-        fromUserId: userId,  // Always include sender's ID
+        fromUserId: userId
       });
     }
   });
 
   // Handle call requests
   socket.on("call-request", async ({ targetUserId }) => {
-    console.log("Call request received from:", userId, "to:", targetUserId);
     const receiverSocketId = userSocketMap[targetUserId];
     
     if (receiverSocketId) {
       try {
-        // Get caller's info
-        const caller = await User.findById(userId).select('fullName profilePic');
-        
-        // Emit to receiver with caller's info
+        const fromUser = await User.findById(userId).select('fullName profilePic');
         io.to(receiverSocketId).emit("call-request", {
-          fromUser: caller,        // Caller's info
-          targetUserId: userId     // Caller's ID for the receiver to call back
-        });
-        
-        // Log for debugging
-        console.log("Emitting call request:", {
-          from: { id: userId, name: caller.fullName },
-          to: { id: targetUserId }
+          fromUser,
+          targetUserId
         });
       } catch (error) {
-        console.error("Error in call request:", error);
-        socket.emit("call-error", { message: "Failed to initiate call" });
+        console.error("Error fetching user for call request:", error);
       }
-    } else {
-      socket.emit("call-error", { message: "User is offline" });
     }
   });
 
   // Handle call acceptance
   socket.on("call-accepted", ({ targetUserId }) => {
-    console.log("Call accepted - From:", userId, "To:", targetUserId);
     const callerSocketId = userSocketMap[targetUserId];
     if (callerSocketId) {
       io.to(callerSocketId).emit("call-accepted", {
-        targetUserId: userId,      // Send accepter's ID back to caller
-        acceptedBy: userId
+        targetUserId: userId
       });
     }
   });

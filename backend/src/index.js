@@ -16,25 +16,14 @@ dotenv.config();
 const PORT = process.env.PORT;
 const __dirname = path.resolve();
 
-const corsOptions = {
-  origin: ["http://localhost:5173", "https://your-frontend-url.com"],
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-app.use(cors(corsOptions));
-app.use(cookieParser());
 app.use(express.json());
-
-// Add this to debug requests
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`, {
-    body: req.body,
-    cookies: req.cookies,
-  });
-  next();
-});
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
