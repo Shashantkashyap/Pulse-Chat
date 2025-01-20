@@ -56,27 +56,34 @@ io.on("connection", (socket) => {
 
   // Handle call requests
   socket.on("call-request", async ({ targetUserId }) => {
+    console.log("Call request received:", { from: userId, to: targetUserId });
     const receiverSocketId = userSocketMap[targetUserId];
     
     if (receiverSocketId) {
       try {
         const fromUser = await User.findById(userId).select('fullName profilePic');
+        console.log("Emitting call request to:", receiverSocketId);
         io.to(receiverSocketId).emit("call-request", {
           fromUser,
-          targetUserId
+          targetUserId: userId // Important: Send caller's ID as targetUserId
         });
       } catch (error) {
-        console.error("Error fetching user for call request:", error);
+        console.error("Error in call request:", error);
+        socket.emit("call-error", { message: "Failed to initiate call" });
       }
+    } else {
+      socket.emit("call-error", { message: "User is offline" });
     }
   });
 
   // Handle call acceptance
   socket.on("call-accepted", ({ targetUserId }) => {
+    console.log("Call accepted:", { by: userId, to: targetUserId });
     const callerSocketId = userSocketMap[targetUserId];
     if (callerSocketId) {
       io.to(callerSocketId).emit("call-accepted", {
-        targetUserId: userId
+        targetUserId: userId,
+        acceptedBy: userId
       });
     }
   });

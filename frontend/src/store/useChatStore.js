@@ -97,17 +97,22 @@ export const useChatStore = create((set, get) => ({
 
     set({ webRTC });
 
-    socket.on('call-request', async (data) => {
-        console.log('Received call request:', data);
-        const { fromUser } = data;
-        set({ incomingCall: fromUser });
+    socket.on('call-request', (data) => {
+        console.log('Call request received:', data);
+        set({ incomingCall: data.fromUser });
         new Audio('/call-ringtone.mp3').play().catch(console.error);
     });
 
     socket.on('call-accepted', async (data) => {
+        console.log('Call accepted:', data);
         const { targetUserId } = data;
-        await webRTC.initializeCall(targetUserId, true);
-        set({ isInCall: true, incomingCall: null });
+        try {
+            await webRTC.initializeCall(targetUserId, true);
+            set({ isInCall: true, incomingCall: null });
+        } catch (error) {
+            console.error('Error in call acceptance:', error);
+            toast.error('Failed to establish call');
+        }
     });
 
     socket.on('call-rejected', () => {

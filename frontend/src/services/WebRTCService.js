@@ -7,30 +7,37 @@ export class WebRTCService {
         this.onStreamChange = null;
         this.onCallReceived = null;
         this.currentCallId = null;
+        this.currentTargetUserId = null;
 
         // Bind socket event handlers
         this.setupSocketHandlers();
     }
 
     setupSocketHandlers() {
+        console.log("Setting up WebRTC signal handlers");
+        
         this.socket.on('webrtc-signal', async (data) => {
-            console.log('Received WebRTC signal:', data);
+            console.log('WebRTC signal received:', data);
             try {
                 switch (data.type) {
                     case 'offer':
+                        console.log('Processing offer from:', data.fromUserId);
+                        this.currentTargetUserId = data.fromUserId;
                         await this.handleOffer(data.offer, data.fromUserId);
                         break;
                     case 'answer':
+                        console.log('Processing answer');
                         await this.handleAnswer(data.answer);
                         break;
                     case 'ice-candidate':
+                        console.log('Processing ICE candidate');
                         if (this.peerConnection) {
-                            await this.peerConnection.addIceCandidate(data.candidate);
+                            await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
                         }
                         break;
                 }
             } catch (error) {
-                console.error('Error handling WebRTC signal:', error);
+                console.error('Error in WebRTC signal handling:', error);
             }
         });
     }
@@ -70,29 +77,22 @@ export class WebRTCService {
     }
 
     createPeerConnection(targetUserId) {
-        console.log("Creating peer connection for:", targetUserId);
-        
         const config = {
             iceServers: [
-                { 
-                    urls: [
-                        'stun:stun1.l.google.com:19302',
-                        'stun:stun2.l.google.com:19302'
-                    ]
-                }
-            ],
-            iceCandidatePoolSize: 10
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]
         };
 
         const pc = new RTCPeerConnection(config);
 
         pc.onicecandidate = ({ candidate }) => {
-            if (candidate) {
-                console.log("Sending ICE candidate");
+            if (candidate && this.currentTargetUserId) {
+                console.log("Sending ICE candidate to:", this.currentTargetUserId);
                 this.socket.emit('webrtc-signal', {
                     type: 'ice-candidate',
                     candidate,
-                    targetUserId
+                    targetUserId: this.currentTargetUserId
                 });
             }
         };
@@ -102,7 +102,7 @@ export class WebRTCService {
         };
 
         pc.ontrack = (event) => {
-            console.log("Received remote track");
+            console.log("Remote track received:", event.streams[0]);
             this.remoteStream = event.streams[0];
             this.onStreamChange?.({
                 localStream: this.localStream,
@@ -114,45 +114,27 @@ export class WebRTCService {
     }
 
     async startCall(targetUserId) {
-        console.log("Initiating call to:", targetUserId);
-        this.currentCallId = targetUserId;
+        console.log("Starting call to:", targetUserId);
+        this.currentTargetUserId = targetUserId;
         this.socket.emit('call-request', { targetUserId });
     }
 
     async initializeCall(targetUserId, isInitiator = true) {
+        console.log("Initializing call:", { targetUserId, isInitiator });
         try {
-            console.log("Initializing call:", { targetUserId, isInitiator });
-            
-            // Cleanup any existing call
-            this.endCall();
-
-            // Create new peer connection
+            this.currentTargetUserId = targetUserId;
             this.peerConnection = this.createPeerConnection(targetUserId);
             
-            // Get media stream
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true
-            });
+            const stream = await this.acquireMediaStream();
+            console.log("Media stream acquired:", stream.getTracks().map(t => t.kind));
 
-            // Add tracks to peer connection
-            this.localStream.getTracks().forEach(track => {
-                console.log("Adding track to peer connection:", track.kind);
-                this.peerConnection.addTrack(track, this.localStream);
-            });
-
-            // Update UI with local stream
-            this.onStreamChange?.({
-                localStream: this.localStream,
-                remoteStream: this.remoteStream
+            stream.getTracks().forEach(track => {
+                this.peerConnection.addTrack(track, stream);
             });
 
             if (isInitiator) {
-                console.log("Creating offer");
-                const offer = await this.peerConnection.createOffer({
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: true
-                });
+                console.log("Creating and sending offer");
+                const offer = await this.peerConnection.createOffer();
                 await this.peerConnection.setLocalDescription(offer);
                 
                 this.socket.emit('webrtc-signal', {
@@ -162,7 +144,7 @@ export class WebRTCService {
                 });
             }
         } catch (error) {
-            console.error("Error in initializeCall:", error);
+            console.error("Call initialization failed:", error);
             this.endCall();
             throw error;
         }
