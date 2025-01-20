@@ -80,8 +80,13 @@ export class WebRTCService {
         const config = {
             iceServers: [
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
-            ]
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' }
+            ],
+            iceCandidatePoolSize: 10,
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require'
         };
 
         const pc = new RTCPeerConnection(config);
@@ -95,6 +100,10 @@ export class WebRTCService {
                     targetUserId: this.currentTargetUserId
                 });
             }
+        };
+
+        pc.onconnectionstatechange = () => {
+            console.log('Connection state:', pc.connectionState);
         };
 
         pc.oniceconnectionstatechange = () => {
@@ -152,18 +161,30 @@ export class WebRTCService {
 
     async handleOffer(offer, targetUserId) {
         try {
+            console.log('Handling offer from:', targetUserId);
+            this.currentTargetUserId = targetUserId;
+
             if (this.peerConnection) {
                 this.endCall();
             }
 
             this.peerConnection = this.createPeerConnection(targetUserId);
-            await this.acquireMediaStream();
 
-            this.localStream.getTracks().forEach(track => {
-                this.peerConnection.addTrack(track, this.localStream);
+            // First set remote description before getting local stream
+            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+            // Get local stream
+            const stream = await this.acquireMediaStream();
+            this.localStream = stream;
+
+            // Add tracks to peer connection
+            stream.getTracks().forEach(track => {
+                console.log('Adding local track to peer connection:', track.kind);
+                this.peerConnection.addTrack(track, stream);
             });
 
-            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            // Create and send answer
+            console.log('Creating answer');
             const answer = await this.peerConnection.createAnswer();
             await this.peerConnection.setLocalDescription(answer);
 
@@ -173,11 +194,13 @@ export class WebRTCService {
                 targetUserId
             });
 
+            // Notify about stream changes
             this.onStreamChange?.({
                 localStream: this.localStream,
                 remoteStream: this.remoteStream
             });
         } catch (error) {
+            console.error('Error handling offer:', error);
             this.endCall();
             throw error;
         }

@@ -40,32 +40,41 @@ io.on("connection", (socket) => {
 
   // Handle WebRTC signaling with logging
   socket.on("webrtc-signal", async (data) => {
-    console.log("Received WebRTC signal:", { type: data.type, from: userId, to: data.targetUserId });
     const receiverSocketId = userSocketMap[data.targetUserId];
-
     if (receiverSocketId) {
-      console.log("Forwarding WebRTC signal to:", receiverSocketId);
+      console.log("WebRTC signal:", {
+        type: data.type,
+        from: userId,
+        to: data.targetUserId
+      });
+      
       io.to(receiverSocketId).emit("webrtc-signal", {
         ...data,
-        fromUserId: userId
+        fromUserId: userId,  // Always include sender's ID
       });
-    } else {
-      console.log("Target user not found:", data.targetUserId);
     }
   });
 
   // Handle call requests
   socket.on("call-request", async ({ targetUserId }) => {
-    console.log("Call request received:", { from: userId, to: targetUserId });
+    console.log("Call request received from:", userId, "to:", targetUserId);
     const receiverSocketId = userSocketMap[targetUserId];
     
     if (receiverSocketId) {
       try {
-        const fromUser = await User.findById(userId).select('fullName profilePic');
-        console.log("Emitting call request to:", receiverSocketId);
+        // Get caller's info
+        const caller = await User.findById(userId).select('fullName profilePic');
+        
+        // Emit to receiver with caller's info
         io.to(receiverSocketId).emit("call-request", {
-          fromUser,
-          targetUserId: userId // Important: Send caller's ID as targetUserId
+          fromUser: caller,        // Caller's info
+          targetUserId: userId     // Caller's ID for the receiver to call back
+        });
+        
+        // Log for debugging
+        console.log("Emitting call request:", {
+          from: { id: userId, name: caller.fullName },
+          to: { id: targetUserId }
         });
       } catch (error) {
         console.error("Error in call request:", error);
@@ -78,11 +87,11 @@ io.on("connection", (socket) => {
 
   // Handle call acceptance
   socket.on("call-accepted", ({ targetUserId }) => {
-    console.log("Call accepted:", { by: userId, to: targetUserId });
+    console.log("Call accepted - From:", userId, "To:", targetUserId);
     const callerSocketId = userSocketMap[targetUserId];
     if (callerSocketId) {
       io.to(callerSocketId).emit("call-accepted", {
-        targetUserId: userId,
+        targetUserId: userId,      // Send accepter's ID back to caller
         acceptedBy: userId
       });
     }

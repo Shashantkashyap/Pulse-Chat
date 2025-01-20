@@ -90,15 +90,18 @@ export const useChatStore = create((set, get) => ({
     console.log('Initializing WebRTC with socket:', socket.id);
     const webRTC = new WebRTCService(socket);
     
-    webRTC.onStreamChange = ({ localStream, remoteStream }) => {
-        console.log('Stream changed:', { hasLocal: !!localStream, hasRemote: !!remoteStream });
-        set({ localStream, remoteStream });
-    };
-
     set({ webRTC });
 
     socket.on('call-request', (data) => {
-        console.log('Call request received:', data);
+        console.log('Received call request from:', data.fromUser?._id);
+        const { authUser } = useAuthStore.getState();
+        
+        // Verify this call is not from ourselves
+        if (data.fromUser?._id === authUser?._id) {
+          console.log('Ignoring self-call');
+          return;
+        }
+
         set({ incomingCall: data.fromUser });
         new Audio('/call-ringtone.mp3').play().catch(console.error);
     });
@@ -137,9 +140,17 @@ export const useChatStore = create((set, get) => ({
 
   startVideoCall: async (userId) => {
     const { webRTC } = get();
+    const { authUser } = useAuthStore.getState();
+
     if (!webRTC) {
         toast.error('Video call service not initialized');
         return;
+    }
+
+    // Prevent calling yourself
+    if (userId === authUser?._id) {
+      toast.error('Cannot call yourself');
+      return;
     }
 
     try {

@@ -12,15 +12,21 @@ const VideoChat = () => {
 
     useEffect(() => {
         if (localVideoRef.current && localStream) {
-            console.log('Setting local video stream');
+            console.log('Setting up local video stream');
             localVideoRef.current.srcObject = localStream;
+            localVideoRef.current.play().catch(error => {
+                console.error('Error playing local video:', error);
+            });
         }
     }, [localStream]);
 
     useEffect(() => {
         if (remoteVideoRef.current && remoteStream) {
-            console.log('Setting remote video stream');
+            console.log('Setting up remote video stream');
             remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.play().catch(error => {
+                console.error('Error playing remote video:', error);
+            });
         }
     }, [remoteStream]);
 
