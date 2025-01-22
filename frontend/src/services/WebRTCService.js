@@ -77,13 +77,25 @@ export class WebRTCService {
     }
 
     createPeerConnection(targetUserId) {
+        console.log("Creating peer connection for:", targetUserId);
+        
         const config = {
             iceServers: [
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
-                { urls: 'stun:stun3.l.google.com:19302' },
-                { urls: 'stun:stun4.l.google.com:19302' }
+                { 
+                    urls: [
+                        'stun:stun1.l.google.com:19302',
+                        'stun:stun2.l.google.com:19302'
+                    ],
+                    username: "",
+                    credential: ""
+                },
+                {
+                    urls: ['turn:numb.viagenie.ca'],
+                    username: 'webrtc@live.com',
+                    credential: 'muazkh'
+                }
             ],
+            iceTransportPolicy: 'all',
             iceCandidatePoolSize: 10,
             bundlePolicy: 'max-bundle',
             rtcpMuxPolicy: 'require'
@@ -91,9 +103,22 @@ export class WebRTCService {
 
         const pc = new RTCPeerConnection(config);
 
+        // Log state changes
+        pc.onconnectionstatechange = () => {
+            console.log('Connection state changed:', pc.connectionState);
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            console.log('ICE Connection state changed:', pc.iceConnectionState);
+        };
+
+        pc.onicegatheringstatechange = () => {
+            console.log('ICE Gathering state changed:', pc.iceGatheringState);
+        };
+
         pc.onicecandidate = ({ candidate }) => {
-            if (candidate && this.currentTargetUserId) {
-                console.log("Sending ICE candidate to:", this.currentTargetUserId);
+            if (candidate) {
+                console.log("New ICE candidate:", candidate.type, candidate.protocol);
                 this.socket.emit('webrtc-signal', {
                     type: 'ice-candidate',
                     candidate,
@@ -102,16 +127,12 @@ export class WebRTCService {
             }
         };
 
-        pc.onconnectionstatechange = () => {
-            console.log('Connection state:', pc.connectionState);
-        };
-
-        pc.oniceconnectionstatechange = () => {
-            console.log("ICE Connection State:", pc.iceConnectionState);
-        };
-
         pc.ontrack = (event) => {
-            console.log("Remote track received:", event.streams[0]);
+            console.log("Remote track received:", {
+                kind: event.track.kind,
+                trackId: event.track.id,
+                streamId: event.streams[0].id
+            });
             this.remoteStream = event.streams[0];
             this.onStreamChange?.({
                 localStream: this.localStream,
@@ -132,20 +153,37 @@ export class WebRTCService {
         console.log("Initializing call:", { targetUserId, isInitiator });
         try {
             this.currentTargetUserId = targetUserId;
+            
+            // Create peer connection first
             this.peerConnection = this.createPeerConnection(targetUserId);
             
+            // Get media stream
             const stream = await this.acquireMediaStream();
-            console.log("Media stream acquired:", stream.getTracks().map(t => t.kind));
+            console.log("Media stream acquired:", {
+                tracks: stream.getTracks().map(t => ({
+                    kind: t.kind,
+                    enabled: t.enabled,
+                    id: t.id
+                }))
+            });
 
+            // Add tracks to peer connection
             stream.getTracks().forEach(track => {
+                console.log("Adding track to peer connection:", track.kind);
                 this.peerConnection.addTrack(track, stream);
             });
 
             if (isInitiator) {
-                console.log("Creating and sending offer");
-                const offer = await this.peerConnection.createOffer();
+                console.log("Creating offer");
+                const offer = await this.peerConnection.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                });
+                
+                console.log("Setting local description");
                 await this.peerConnection.setLocalDescription(offer);
                 
+                console.log("Sending offer to:", targetUserId);
                 this.socket.emit('webrtc-signal', {
                     type: 'offer',
                     offer,

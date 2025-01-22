@@ -37,33 +37,54 @@ io.on("connection", (socket) => {
   userSocketMap[userId] = socket.id;
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
-  // Handle WebRTC signaling
+  // Handle WebRTC signaling with detailed logging
   socket.on("webrtc-signal", async (data) => {
-    const { targetUserId } = data;
-    const receiverSocketId = userSocketMap[targetUserId];
+    const receiverSocketId = userSocketMap[data.targetUserId];
+    console.log("WebRTC Signal:", {
+      type: data.type,
+      from: userId,
+      to: data.targetUserId,
+      receiverFound: !!receiverSocketId,
+      signalData: data.type === 'ice-candidate' ? 'ICE Candidate' : data.type
+    });
 
     if (receiverSocketId) {
+      console.log(`Forwarding ${data.type} to socket:`, receiverSocketId);
       io.to(receiverSocketId).emit("webrtc-signal", {
         ...data,
         fromUserId: userId
       });
+    } else {
+      console.warn("Target user not found in socket map:", data.targetUserId);
+      socket.emit("call-error", { message: "User is not available" });
     }
   });
 
-  // Handle call requests
+  
+
+  // Handle call requests with logging
   socket.on("call-request", async ({ targetUserId }) => {
-    const receiverSocketId = userSocketMap[targetUserId];
+    console.log("Call Request:", {
+      from: userId,
+      to: targetUserId,
+      timestamp: new Date().toISOString()
+    });
     
+    const receiverSocketId = userSocketMap[targetUserId];
     if (receiverSocketId) {
       try {
         const fromUser = await User.findById(userId).select('fullName profilePic');
+        console.log("Emitting call request to:", receiverSocketId);
         io.to(receiverSocketId).emit("call-request", {
           fromUser,
-          targetUserId
+          targetUserId: userId // Important: Send caller's ID
         });
       } catch (error) {
-        console.error("Error fetching user for call request:", error);
+        console.error("Call request error:", error);
+        socket.emit("call-error", { message: "Failed to initiate call" });
       }
+    } else {
+      socket.emit("call-error", { message: "User is offline" });
     }
   });
 
