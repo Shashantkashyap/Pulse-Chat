@@ -20,7 +20,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://pulse-chat-3-frontend.onrender.com",
     credentials: true,
   })
 );

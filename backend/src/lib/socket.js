@@ -8,7 +8,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "https://your-frontend-domain.com"],
+    origin: ["http://localhost:5173", "https://pulse-chat-3-frontend.onrender.com"],
     credentials: true,
     methods: ["GET", "POST"]
   },
@@ -60,7 +60,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  
+
 
   // Handle call requests with logging
   socket.on("call-request", async ({ targetUserId }) => {
