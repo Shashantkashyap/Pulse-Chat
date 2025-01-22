@@ -17,15 +17,25 @@ const PORT = process.env.PORT;
 const __dirname = path.resolve();
 
 const corsOptions = {
-  origin: ["http://localhost:5173",, "https://pulse-chat-3-frontend.onrender.com"],
+  origin: ["http://localhost:5173", "https://pulse-chat-3-frontend.onrender.com"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["set-cookie"]
 };
 
-app.use(cors(corsOptions));
-app.use(cookieParser());
 app.use(express.json());
+app.use(cookieParser());
+app.use(cors(corsOptions));
+
+app.use((req, res, next) => {
+  const oldSetHeader = res.setHeader;
+  res.setHeader = function(name, value) {
+    console.log('Setting header:', name, value);
+    return oldSetHeader.apply(this, arguments);
+  };
+  next();
+});
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);

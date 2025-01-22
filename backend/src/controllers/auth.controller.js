@@ -48,8 +48,8 @@ export const signup = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-  const { email, password } = req.body;
   try {
+    const { email, password } = req.body;
     const user = await User.findOne({ email });
 
     if (!user) {
@@ -61,7 +61,24 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    generateToken(user._id, res);
+    // Generate token and set cookie
+    const token = generateToken(user._id);
+    
+    // Set cookie with specific options for cross-origin
+    res.cookie("jwt", token, {
+      maxAge: 15 * 24 * 60 * 60 * 1000, // 15 days
+      httpOnly: true,
+      secure: true, // Required for production
+      sameSite: 'none', // Required for cross-origin
+      path: '/'
+    });
+
+    // Log for debugging
+    console.log('Login successful:', {
+      userId: user._id,
+      tokenGenerated: !!token,
+      cookieSet: true
+    });
 
     res.status(200).json({
       _id: user._id,
@@ -70,7 +87,7 @@ export const login = async (req, res) => {
       profilePic: user.profilePic,
     });
   } catch (error) {
-    console.log("Error in login controller", error.message);
+    console.error("Login error:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

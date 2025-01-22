@@ -12,7 +12,7 @@ export const generateToken = (userId, res) => {
     sameSite: 'none', // Important for cross-site requests
     secure: true, // Required for sameSite: 'none'
     path: '/',
-    domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
+    domain:  '.onrender.com'
   });
 
   return token;
