@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 
 const BASE_URL = import.meta.env.MODE === "development" ? "https://pulse-chat-3.onrender.com" : "/";
-const SOCKET_URL = "https://pulse-chat-2.onrender.com";
+const SOCKET_URL = "https://pulse-chat-3.onrender.com";
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
@@ -92,8 +92,7 @@ export const useAuthStore = create((set, get) => ({
 
     try {
       get().disconnectSocket();
-
-      console.log("Connecting socket for user:", authUser._id);
+      console.log("Connecting to socket URL:", SOCKET_URL);
       const socket = io(SOCKET_URL, {
         query: { userId: authUser._id },
         withCredentials: true,

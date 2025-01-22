@@ -1,7 +1,11 @@
 import axios from "axios";
 
+const BASE_URL = "https://pulse-chat-3.onrender.com/api";
+
 export const axiosInstance = axios.create({
- // baseURL: import.meta.env.MODE === "development" ? "http://localhost:5001/api" : "https://pulse-chat-2.onrender.com",
- baseURL: import.meta.env.MODE === "development" ? "https://pulse-chat-3.onrender.com" : "/api",
+  baseURL: BASE_URL,
   withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });

@@ -16,14 +16,16 @@ dotenv.config();
 const PORT = process.env.PORT;
 const __dirname = path.resolve();
 
-app.use(express.json());
+const corsOptions = {
+  origin: ["http://localhost:5173",, "https://pulse-chat-3-frontend.onrender.com"],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+};
+
+app.use(cors(corsOptions));
 app.use(cookieParser());
-app.use(
-  cors({
-    origin: "https://pulse-chat-3-frontend.onrender.com",
-    credentials: true,
-  })
-);
+app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
